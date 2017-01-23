@@ -5,6 +5,8 @@
 #ifndef SHOUSESERVERCOMPONENT_LOGIMPL_H
 #define SHOUSESERVERCOMPONENT_LOGIMPL_H
 
+#include <iostream>
+
 // TODO: use branch prediction optimization.
 // WARN: platform-specific. Need to check whether this optimization is supported.
 #define likely(x)       __builtin_expect((x),1)
@@ -36,8 +38,9 @@ void Log::info(const std::string& TAG, const char* fmt, const Args&... args) {
 template <typename T>
 void Log::debug(const std::string& TAG, const T& val) {
     auto logger = spdlog::get(TAG);
-    if (logger) {
-        logger->debug(val);
+
+    if (logger != nullptr) {
+        logger->info(val);
     } else {
         logger = spdlog::stdout_color_mt(TAG);
         logger->info(val);
@@ -48,7 +51,7 @@ template <typename ...Args>
 void Log::debug(const std::string& TAG, const char* fmt, const Args&... args) {
     auto logger = spdlog::get(TAG);
     if (logger) {
-        logger->debug(fmt, args...);
+        logger->info(fmt, args...);
     } else {
         logger = spdlog::stdout_color_mt(TAG);
         logger->info(fmt, args...);
