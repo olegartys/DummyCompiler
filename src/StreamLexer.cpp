@@ -4,6 +4,9 @@
 #define TAG "LangTokenHolder"
 
 LangTokenHolder::Token StreamLexer::getNextToken() {
+
+	throw std::runtime_error("Not implemented!");
+
 	LangTokenHolder::Token retTok;
 
 	// Skip whitespaces
