@@ -9,6 +9,12 @@
 {
 # include <string>
 #include <cstdio>
+#include <memory>
+
+#include <AST.h>
+
+extern std::shared_ptr<NBlock> programBlock;
+
 class CompilerContext;
 }
 
@@ -19,42 +25,137 @@ class CompilerContext;
 %code
 {
 #include <CompilerContext.h>
+#include <AST.h>
 }
 
 %define api.token.prefix {TOK_}
 
 %token 
 	END  0  "end of file"
-	TEMPERATURE "temperature"
-	HEAT "heat"
-	TARGET "target"
+	EQUAL "="
+	CEQ "=="
+	CNEQ "!="
+	CLT "<"
+	CLTE "<="
+	CGT ">"
+	CGTE ">="
+	LPAREN "("
+	RPAREN ")"
+	LBRACE "{"
+	RBRACE "}"
+	DOT "."
+	COMMA ","
+	PLUS "+"
+	MINUS "-"
+	MUL "*"
+	DIV "/"
+	SEMICOLON ";"
 ;
 
-%token <int> NUMBER "number"
-//%type <int> NUMBER
+%token <int> INTEGER_CONST "integer"
+%token <double> DOUBLE_CONST "double"
 
-%token <std::string> STATE "state"
-//%type <std::string> STATE
+%token <std::string> IDENTIFIER "identifier"
+
+%type <std::shared_ptr<NStatement>> stmt var_decl func_decl 
+%type <std::shared_ptr<NExpression>> expr assignment function_call
+%type <std::shared_ptr<NExpression>> numeric
+%type <std::shared_ptr<NIdentifier>> ident
+%type <std::shared_ptr<NBlock>> program stmts block
+
+%type <std::shared_ptr<ExpressionList>> call_args
+%type <std::shared_ptr<VariableList>> func_decl_args
+
+%type <char> comparison // FIXME : is not actually correct
 
 %printer { yyoutput << $$; } <*>;
 
+%start program
+
+// FIXME: write macro to simpilfy move-construction
 %%
 
-commands: | commands command;
+program : stmts { programBlock = $1; } 
+		;
 
-command: heat_switch | target_set;
+stmts : stmt { 
+		  $$ = std::move(std::shared_ptr<NBlock>(new NBlock())); 
+		  $$->statements.push_back($1); 
+	  }
+	  | stmts stmt { 
+		  $1->statements.push_back($2); 
+		  /* Remember statement list for the next iteration (OR ir will be NULL) */
+		  $$ = $1; 
+	  }
+	  ;
+	  
+stmt : var_decl | func_decl
+	 | expr { $$ = std::move(std::shared_ptr<NExpressionStatement>(new NExpressionStatement(*$1))); }
+	 ;
 
-heat_switch: HEAT STATE {
-	printf("\nHere\n");
-};
+func_decl : ident ident LPAREN func_decl_args RPAREN block 
+		  {
+				$$ = std::move(std::shared_ptr<NFunctionDeclaration>(new NFunctionDeclaration(*$1, *$2, *$4, *$6)));
+		  }
+		  ;
+		  
+func_decl_args : 
+			   { 
+					$$ = std::move(std::shared_ptr<VariableList>(new VariableList())); 
+			   }
+			   | var_decl { 
+				    $$ = std::move(std::shared_ptr<VariableList>(new VariableList())); 
+				    $$->push_back($1);
+			   }
+			   | func_decl_args COMMA var_decl { 
+				    $1->push_back($3); 
+				    $$ = $1;
+			   }
+			   ;
+			   
+block : LBRACE stmts RBRACE  { $$ = $2; }
+	  | LBRACE RBRACE { $$ = std::move(std::shared_ptr<NBlock>(new NBlock())); }
+	  ;
+	  
+var_decl : ident ident { $$ = std::move(std::shared_ptr<NStatement>(new NVariableDeclaration(*$1, *$2))); }
+         | ident ident EQUAL expr { $$ = std::move(std::shared_ptr<NStatement>(new NVariableDeclaration(*$1, *$2, $4))); }
+         ;
 
-target_set: TARGET TEMPERATURE NUMBER {
-	printf("\%d\n", $3);
-};
+expr : assignment { $$ = $1; }
+	 | function_call { $$ = $1; }
+	 | ident { $$ = $1; }
+	 | expr comparison expr { $$ = std::move(std::shared_ptr<NBinaryOp>(new NBinaryOp(*$1, $2, *$3))); }
+	 | LPAREN expr RPAREN { $$ = $2; }
+	 | numeric 
+	 ;
+	 
+assignment : ident EQUAL expr { $$ = std::move(std::shared_ptr<NAssignment>(new NAssignment(*$1, *$3))); }
+		   ;
+		   
+function_call : ident LPAREN call_args RPAREN { $$ = std::move(std::shared_ptr<NFunctionCall>(new NFunctionCall(*$1, *$3))); }
+			  ;
+			  
+call_args : { $$ = std::move(std::shared_ptr<ExpressionList>(new ExpressionList())); }
+		  | expr { $$ = std::move(std::shared_ptr<ExpressionList>(new ExpressionList())); $$->push_back($1); }
+		  | call_args COMMA expr { $1->push_back($3); $$ = $1; }
+		  ;
+			  
+comparison : CEQ | CNEQ | CLT | CLTE | CGT | CGTE 
+           | PLUS | MINUS | MUL | DIV
+		   ;
+
+numeric : INTEGER_CONST { $$ = std::move(std::shared_ptr<NExpression>(new NIntegerConst($1))); }
+		| DOUBLE_CONST  { $$ = std::move(std::shared_ptr<NExpression>(new NDoubleConst($1))); }
+		;
+
+ident : "identifier" { $$ = std::move(std::shared_ptr<NIdentifier>(new NIdentifier($1))); }
+	  ;
 
 %%
 
-void yy::BisonParser::error(const std::string&) { /* FIXME: handler errors there */}
+void yy::BisonParser::error(const std::string& err) { 
+	std::cout << "ERROR: " << err << "\n";
+}
 
 
 

@@ -15,6 +15,8 @@
 # undef yywrap
 # define yywrap() 1
 
+// FIXME : check for location argument to be sent when constructing
+
 // FIXME: some conversion error
 #undef yyterminate
 #define yyterminate() return yy::BisonParser::make_END();
@@ -28,12 +30,32 @@ blank [ \t]+
 
 %%
 
-{int} return yy::BisonParser::make_NUMBER(-1);
-heat return yy::BisonParser::make_HEAT();
-on|off return yy::BisonParser::make_STATE(yytext);
-target return yy::BisonParser::make_TARGET();
-temperature return yy::BisonParser::make_TEMPERATURE();
-[\n]+ ;
-{blank}+ ;
+"=" { return yy::BisonParser::make_EQUAL(); }
+"==" { return yy::BisonParser::make_CEQ(); }
+"!=" { return yy::BisonParser::make_CNEQ(); }
+"<" { return yy::BisonParser::make_CLT(); }
+"<=" { return yy::BisonParser::make_CLTE(); }
+">" { return yy::BisonParser::make_CGT(); }
+">=" { return yy::BisonParser::make_CGT(); }
+"(" { return yy::BisonParser::make_LPAREN(); }
+")" { return yy::BisonParser::make_RPAREN(); }
+"{" { return yy::BisonParser::make_LBRACE(); }
+"}" { return yy::BisonParser::make_RBRACE(); }
+"." { return yy::BisonParser::make_DOT(); }
+"," { return yy::BisonParser::make_COMMA(); }
+"+" { return yy::BisonParser::make_PLUS(); }
+"-" { return yy::BisonParser::make_MINUS(); }
+"*" { return yy::BisonParser::make_MUL(); }
+"/" { return yy::BisonParser::make_DIV(); }
+";" { return yy::BisonParser::make_SEMICOLON(); }
+
+
+
+{int} { return yy::BisonParser::make_INTEGER_CONST(5); }
+[0-9]+\.[0-9]* { return yy::BisonParser::make_DOUBLE_CONST(3.14); }
+[a-zA-Z_][a-zA-Z0-9_]* { return yy::BisonParser::make_IDENTIFIER(yytext); }
+
+[ \n]+;
+{blank}+;
 
 %%
