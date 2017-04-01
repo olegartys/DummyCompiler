@@ -13,12 +13,33 @@
 #include "../src/flex_bison_output/BisonParser.hpp"
 
 #define YY_DECL \
-  yy::BisonParser::symbol_type yylex (CompilerContext& d)
+    yy::BisonParser::symbol_type yylex (CompilerContext& d)
 // ... and declare it for the parser's sake.
 YY_DECL;
 
-
 class CompilerContext {
+public:
+    CompilerContext(const std::string& inputPath = "");
+
+    virtual ~CompilerContext();
+
+    virtual void setRootNode(const std::shared_ptr<NBlock>& rootBlock) {
+        this->mRootASTBlock = rootBlock;
+    }
+
+    virtual void parse() {
+        if (!mInputFile) {
+            throw std::runtime_error("Input file handler is null!");
+        }
+        mBisonParser.parse();
+    }
+
+protected:
+    yy::BisonParser mBisonParser;
+
+    std::shared_ptr<NBlock> mRootASTBlock;
+    std::string mInputPath;
+    FILE* mInputFile;
 
 };
 
