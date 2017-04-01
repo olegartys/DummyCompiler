@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <Log.h>
+#include "IVisitor.h"
 
 #define LOG_TAG "AST"
 
@@ -15,14 +16,15 @@ class NVariableDeclaration;
 class NStatement;
 class NExpression;
 
-using VariableList = std::vector<std::shared_ptr<NStatement>>;
-using StatementList = std::vector<std::shared_ptr<NStatement>>;
+using VariableList   = std::vector<std::shared_ptr<NStatement>>;
+using StatementList  = std::vector<std::shared_ptr<NStatement>>;
 using ExpressionList = std::vector<std::shared_ptr<NExpression>>;
 
 class BaseNode {
 public:
     virtual ~BaseNode() = default;
-    virtual void codeGen() {}
+
+    virtual void accept(IVisitor& v) = 0;
 };
 
 class NExpression : public BaseNode { };
@@ -31,111 +33,160 @@ class NStatement : public BaseNode { };
 
 class NIntegerConst : public NExpression {
 public:
-    long long mVal;
+    std::string mVal;
 
-    NIntegerConst(long long value) : mVal(value) { Log::info(LOG_TAG, "[NIntegerConst]");}
-    virtual void codeGen() override { }
+    NIntegerConst(const std::string& value) : mVal(value) {
+        Log::info(LOG_TAG, "[NIntegerConst] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 };
 
 class NDoubleConst : public NExpression {
 public:
-    double mVal;
+    std::string mVal;
 
-    NDoubleConst(double value) : mVal(value) { Log::info(LOG_TAG, "[NDoubleConst]"); }
-    virtual void codeGen() override { }
+    NDoubleConst(const std::string& value) : mVal(value) {
+        Log::info(LOG_TAG, "[NDoubleConst] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 };
 
 class NIdentifier : public NExpression {
 public:
     std::string mVal;
 
-    NIdentifier(const std::string& name) : mVal(name) { Log::info(LOG_TAG, "[NIdentifier]"); }
-    virtual void codeGen() override { }
+    NIdentifier(const std::string& name) : mVal(name) {
+        Log::info(LOG_TAG, "[NIdentifier] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 };
 
 class NVariableDeclaration : public NStatement {
 public:
-    const NIdentifier& type;
-    NIdentifier& id;
-    std::shared_ptr<NExpression> assignmentExpr;
+    std::shared_ptr<NIdentifier> mType;
+    std::shared_ptr<NIdentifier> mId;
+    std::shared_ptr<NExpression> mAsignExpr;
 
-    NVariableDeclaration(const NIdentifier& type, NIdentifier& id) :
-            type(type), id(id) { Log::info(LOG_TAG, "[NVariableDeclaration]"); }
+    NVariableDeclaration(std::shared_ptr<NIdentifier>& type, std::shared_ptr<NIdentifier>& id) :
+            mType(type), mId(id) {
+        Log::info(LOG_TAG, "[NVariableDeclaration] created");
+    }
 
-    NVariableDeclaration(const NIdentifier& type, NIdentifier& id, std::shared_ptr<NExpression> assignmentExpr) :
-            type(type), id(id), assignmentExpr(assignmentExpr) { Log::info(LOG_TAG, "[NVariableDeclaration]"); }
+    NVariableDeclaration(std::shared_ptr<NIdentifier>& type, std::shared_ptr<NIdentifier>& id,
+                         std::shared_ptr<NExpression>& assignmentExpr) :
+            mType(type), mId(id), mAsignExpr(assignmentExpr) {
+        Log::info(LOG_TAG, "[NVariableDeclaration] created");
+    }
 
-    virtual void codeGen() override { }
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 };
 
 class NBlock : public NExpression {
 public:
-    StatementList statements;
+    StatementList mStatements;
 
-    NBlock() { Log::info(LOG_TAG, "[NBlock]"); }
+    NBlock() { Log::info(LOG_TAG, "[NBlock] created"); }
 
-    virtual void codeGen() override { }
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 
 };
 
 class NAssignment : public NExpression {
 public:
-    int op;
-    NExpression& lhs;
-    NExpression& rhs;
+    int mOp;
+    std::shared_ptr<NExpression> mLhs;
+    std::shared_ptr<NExpression> mRhs;
 
-    NAssignment(NIdentifier& lhs, NExpression& rhs) :
-            lhs(lhs), rhs(rhs) { Log::info(LOG_TAG, "[NAssignment]"); }
+    NAssignment(std::shared_ptr<NIdentifier>& lhs, std::shared_ptr<NExpression>& rhs) :
+            mLhs(lhs), mRhs(rhs) {
+        Log::info(LOG_TAG, "[NAssignment] created");
+    }
 
-    virtual void codeGen() override { }
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 
 };
 
 class NFunctionDeclaration : public NStatement {
 public:
-    const NIdentifier& type;
-    const NIdentifier& id;
-    VariableList arguments;
-    NBlock& block;
+    std::shared_ptr<NIdentifier> mType;
+    std::shared_ptr<NIdentifier> mId;
+    std::shared_ptr<VariableList> mArguments;
+    std::shared_ptr<NBlock> mBlock;
 
-    NFunctionDeclaration(const NIdentifier& type, const NIdentifier& id,
-            const VariableList& args, NBlock& block) :
-        type(type), id(id), arguments(args), block(block) { Log::info(LOG_TAG, "[NFunctionDeclaration]"); }
+    NFunctionDeclaration(std::shared_ptr<NIdentifier>& type, std::shared_ptr<NIdentifier>& id,
+                         std::shared_ptr<VariableList>& args, std::shared_ptr<NBlock>& block) :
+            mType(type), mId(id), mArguments(args), mBlock(block) {
 
-    virtual void codeGen() override { }
+        Log::info(LOG_TAG, "[NFunctionDeclaration] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 
 };
 
 class NFunctionCall : public NExpression {
 public:
-    const NIdentifier& id;
-    ExpressionList arguments;
+    std::shared_ptr<NIdentifier> mId;
+    std::shared_ptr<ExpressionList> mArguments;
 
-    NFunctionCall(const NIdentifier& id, ExpressionList& arguments) :
-            id(id), arguments(arguments) { Log::info(LOG_TAG, "[NFunctionCall]"); }
-    NFunctionCall(const NIdentifier& id) : id(id) { Log::info(LOG_TAG, "[NFunctionCall]"); }
+    NFunctionCall(std::shared_ptr<NIdentifier>& id, std::shared_ptr<ExpressionList>& arguments) :
+            mId(id), mArguments(arguments) {
+        Log::info(LOG_TAG, "[NFunctionCall] created");
+    }
 
-    virtual void codeGen() override { }
+    NFunctionCall(std::shared_ptr<NIdentifier>& id) :
+            mId(id) {
+        Log::info(LOG_TAG, "[NFunctionCall] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 };
 
 class NExpressionStatement : public NStatement {
 public:
-    NExpression& expression;
-    NExpressionStatement(NExpression& expression) :
-            expression(expression) { Log::info(LOG_TAG, "[NExpressionStatement]"); }
+    std::shared_ptr<NExpression> mExpression;
 
-    virtual void codeGen() override { }
+    NExpressionStatement(std::shared_ptr<NExpression>& expression) :
+            mExpression(expression) {
+        Log::info(LOG_TAG, "[NExpressionStatement] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 };
 
 class NBinaryOp : public NExpression {
 public:
-    int op;
-    NExpression& lhs;
-    NExpression& rhs;
-    NBinaryOp(NExpression& lhs, int op, NExpression& rhs) :
-            lhs(lhs), rhs(rhs), op(op) { }
+    int mOp;
+    std::shared_ptr<NExpression> mLhs;
+    std::shared_ptr<NExpression> mRhs;
 
-    virtual void codeGen() override { }
+    NBinaryOp(std::shared_ptr<NExpression>& lhs, int op, std::shared_ptr<NExpression>& rhs) :
+            mLhs(lhs), mRhs(rhs), mOp(op) {
+        Log::info(LOG_TAG, "[NBinaryOp] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
+};
+
+class NReturnStatement : public NStatement {
+public:
+    std::shared_ptr<NIdentifier> mReturnIdent;
+    std::shared_ptr<NExpression> mNumericVal;
+
+    NReturnStatement(std::shared_ptr<NIdentifier>& returnIdent) :
+            mReturnIdent(returnIdent) {
+        Log::info(LOG_TAG, "[NReturnStatement] created");
+    }
+
+    NReturnStatement(std::shared_ptr<NExpression>& numericVal) :
+            mNumericVal(numericVal) {
+        Log::info(LOG_TAG, "[NReturnStatement] created");
+    }
+
+    virtual void accept(IVisitor& v) override { v.visit(this); }
 };
 
 #endif //DUMMYCOMPILER_NODE_H

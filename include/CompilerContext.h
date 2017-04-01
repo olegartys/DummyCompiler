@@ -21,10 +21,21 @@ class CompilerContext {
 public:
     CompilerContext(const std::string& inputPath = "");
 
+    CompilerContext(const CompilerContext&) = delete;
+    CompilerContext& operator= (const CompilerContext&) = delete;
+
     virtual ~CompilerContext();
+
+    virtual void setParserDebugLvl(int lvl) {
+        mBisonParser.set_debug_level(lvl);
+    }
 
     virtual void setRootNode(const std::shared_ptr<NBlock>& rootBlock) {
         this->mRootASTBlock = rootBlock;
+    }
+
+    virtual std::shared_ptr<NBlock> getRootNode() const {
+        return mRootASTBlock;
     }
 
     virtual void parse() {
@@ -33,6 +44,7 @@ public:
         }
         mBisonParser.parse();
     }
+
 
 protected:
     yy::BisonParser mBisonParser;

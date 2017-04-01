@@ -1,20 +1,33 @@
 #include <Log.h>
 #include <CompilerContext.h>
-#include "flex_bison_output/BisonParser.hpp"
 
-#include <AST.h>
+#include <VisitorPrint.h>
 
-std::shared_ptr<NBlock> programBlock;
+#define LOG_TAG "main"
 
 int main() {
+    std::shared_ptr<CompilerContext> ctx;
+    VisitorPrint visitorPrint;
+
     try {
-        CompilerContext ctx;
-        ctx.parse();
+        ctx = std::make_shared<CompilerContext>("test");
     } catch (std::runtime_error& e) {
-        std::cerr << e.what();
+        Log::error(LOG_TAG, "{}", e.what());
+        exit(EXIT_FAILURE);
     }
-//	yy::BisonParser parser(ctx);
-//    // parser.set_debug_level(4);
-//    parser.parse();
-	return 42;
+
+    ctx->parse();
+    ctx->setParserDebugLvl(0);
+
+    auto rootASTblock = ctx->getRootNode();
+    if (!rootASTblock) {
+        Log::error(LOG_TAG, "Parser failed!");
+        exit(EXIT_FAILURE);
+    } else {
+        for (auto it: rootASTblock->mStatements) {
+            it->accept(visitorPrint);
+        }
+    }
+
+	return 0;
 }

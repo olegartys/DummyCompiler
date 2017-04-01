@@ -26,6 +26,9 @@
 %option noyywrap nounput batch debug noinput
 
 int [0-9]+
+double [0-9]+\.[0-9]*
+identifier [a-zA-Z_][a-zA-Z0-9_]*
+
 blank [ \t]+
 
 %%
@@ -48,12 +51,11 @@ blank [ \t]+
 "*" { return yy::BisonParser::make_MUL(); }
 "/" { return yy::BisonParser::make_DIV(); }
 ";" { return yy::BisonParser::make_SEMICOLON(); }
+"return" { return yy::BisonParser::make_RETURN(); }
 
-
-
-{int} { return yy::BisonParser::make_INTEGER_CONST(5); }
-[0-9]+\.[0-9]* { return yy::BisonParser::make_DOUBLE_CONST(3.14); }
-[a-zA-Z_][a-zA-Z0-9_]* { return yy::BisonParser::make_IDENTIFIER(yytext); }
+{int} { return yy::BisonParser::make_INTEGER_CONST(yytext); }
+{double} { return yy::BisonParser::make_DOUBLE_CONST(yytext); }
+{identifier} { return yy::BisonParser::make_IDENTIFIER(yytext); }
 
 [ \n]+;
 {blank}+;
