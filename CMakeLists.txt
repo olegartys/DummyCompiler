@@ -16,7 +16,7 @@ ADD_FLEX_BISON_DEPENDENCY(FLEX_LEXER BISON_PARSER)
 add_executable(${CMAKE_PROJECT_NAME}
         ${BISON_BISON_PARSER_OUTPUTS}
         ${FLEX_FLEX_LEXER_OUTPUTS}
-        src/main.cpp src/LangTokenHolder.cpp src/StreamLexer.cpp src/CompilerContext.cpp include/CompilerContext.h)
+        src/main.cpp src/CompilerContext.cpp include/CompilerContext.h include/AST.h include/IVisitor.h include/VisitorPrint.h)
 
 # Bison/flex output headers
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC flex_bison_output/)

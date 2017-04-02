@@ -78,120 +78,91 @@ class CompilerContext;
 // FIXME: write macro to simpilfy move-construction
 %%
 
-program : stmts { ctx.setRootNode($1); } 
-		;
+program : 
+	stmts { ctx.setRootNode($1); } 
+;
 
-stmts : stmt { 
-			$$ = std::move(std::shared_ptr<NBlock>(new NBlock())); 
-			$$->mStatements.push_back($1); 
-	  	}
-	  	| stmts stmt { 
-			$1->mStatements.push_back($2); 
-			/* Remember statement list for the next iteration (OR ir will be NULL) */
-			$$ = $1; 
-	  	}
-	  	;
+stmts : 
+	stmt { $$ = std::move(std::shared_ptr<NBlock>(new NBlock())); $$->mStatements.push_back($1); }
+|   stmts stmt { $1->mStatements.push_back($2); /* Remember statement list for the next iteration (OR ir will be NULL) */ $$ = $1; }
+;
 	  
-stmt : var_decl { $$ = $1; } 
-	 | func_decl { $$ = $1; }
-	 | return_statement { $$ = $1; }
-	 | expr { 
-	 	$$ = std::move(std::shared_ptr<NExpressionStatement>(new NExpressionStatement($1))); 
-	 }
-	 ;
+stmt : 
+	var_decl { $$ = $1; } 
+| 	func_decl { $$ = $1; }
+| 	return_statement { $$ = $1; }
+| 	expr { $$ = std::move(std::shared_ptr<NExpressionStatement>(new NExpressionStatement($1))); }
+;
 
-func_decl : ident ident LPAREN func_decl_args RPAREN block {
-				$$ = std::move(std::shared_ptr<NFunctionDeclaration>(new NFunctionDeclaration($1, $2, $4, $6)));
-		  	}
-		  	;
+func_decl : 
+	ident ident LPAREN func_decl_args RPAREN block { $$ = std::move(std::shared_ptr<NFunctionDeclaration>(new NFunctionDeclaration($1, $2, $4, $6))); }
+;
 		  
-func_decl_args : { 
-					$$ = std::move(std::shared_ptr<VariableList>(new VariableList())); 
-			   	 }
-			   	 | var_decl { 
-				     $$ = std::move(std::shared_ptr<VariableList>(new VariableList())); 
-				     $$->push_back($1);
-			     }
-			     | func_decl_args COMMA var_decl { 
-				     $1->push_back($3); 
-				     $$ = $1;
-			     }
-			     ;
+func_decl_args : 
+		{ $$ = std::move(std::shared_ptr<VariableList>(new VariableList()));  }
+| 	var_decl { $$ = std::move(std::shared_ptr<VariableList>(new VariableList())); $$->push_back($1); }
+| 	func_decl_args COMMA var_decl { $1->push_back($3); $$ = $1; }
+;
 			   
-block : LBRACE stmts RBRACE  { $$ = $2; }
-	  | LBRACE RBRACE { $$ = std::move(std::shared_ptr<NBlock>(new NBlock())); }
-	  ;
+block : 
+	LBRACE stmts RBRACE  { $$ = $2; }
+| 	LBRACE RBRACE { $$ = std::move(std::shared_ptr<NBlock>(new NBlock())); }
+;
 	  
-var_decl : ident ident { 
-		    	$$ = std::move(std::shared_ptr<NStatement>(new NVariableDeclaration($1, $2))); 
-		   }
-           | ident ident EQUAL expr { 
-           		$$ = std::move(std::shared_ptr<NStatement>(new NVariableDeclaration($1, $2, $4))); 
-           }
-           ;
+var_decl : 
+	ident ident { $$ = std::move(std::shared_ptr<NStatement>(new NVariableDeclaration($1, $2))); }
+| 	ident ident EQUAL expr { $$ = std::move(std::shared_ptr<NStatement>(new NVariableDeclaration($1, $2, $4))); }
+;
 
-expr : assignment { $$ = $1; }
-	 | function_call { $$ = $1; }
-	 | ident { $$ = $1; }
-	 | expr comparison expr { $$ = std::move(std::shared_ptr<NBinaryOp>(new NBinaryOp($1, $2, $3))); }
-	 | LPAREN expr RPAREN { $$ = $2; }
-	 | numeric { $$ = $1; }
-	 ;
+expr : 
+	assignment { $$ = $1; }
+| 	function_call { $$ = $1; }
+| 	ident { $$ = $1; }
+| 	expr comparison expr { $$ = std::move(std::shared_ptr<NBinaryOp>(new NBinaryOp($1, $2, $3))); }
+| 	LPAREN expr RPAREN { $$ = $2; }
+| 	numeric { $$ = $1; }
+;
 	 
-return_statement : RETURN ident { 
-				 		$$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); 
-				   }
-				   | RETURN numeric { 
-				   		$$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); 
-				   }
-				   ;
+return_statement : 
+	RETURN ident { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); }
+| 	RETURN numeric { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); }
+;
 	 
-assignment : ident EQUAL expr { 
-				$$ = std::move(std::shared_ptr<NAssignment>(new NAssignment($1, $3))); 
-			 }
-		     ;
+assignment : 
+	ident EQUAL expr { $$ = std::move(std::shared_ptr<NAssignment>(new NAssignment($1, $3))); }
+;
 		   
-function_call : ident LPAREN call_args RPAREN { 
-					$$ = std::move(std::shared_ptr<NFunctionCall>(new NFunctionCall($1, $3))); 
-			    }
-			    ;
+function_call : 
+	ident LPAREN call_args RPAREN { $$ = std::move(std::shared_ptr<NFunctionCall>(new NFunctionCall($1, $3))); }
+;
 			  
-call_args : { 
-			  $$ = std::move(std::shared_ptr<ExpressionList>(new ExpressionList())); 
-		  }
-		  | expr { 
-			  $$ = std::move(std::shared_ptr<ExpressionList>(new ExpressionList())); 
-			  $$->push_back($1); 
-		  }
-		  | call_args COMMA expr { 
-			  $1->push_back($3); 
-			  $$ = $1; 
-		  }
-		  ;
+call_args : 
+	{ $$ = std::move(std::shared_ptr<ExpressionList>(new ExpressionList())); }
+| 	expr { $$ = std::move(std::shared_ptr<ExpressionList>(new ExpressionList())); $$->push_back($1) ; }
+| 	call_args COMMA expr { $1->push_back($3); $$ = $1; }
+;
 		  
-comparison : CEQ { $$ = token::TOK_CEQ; } | CNEQ { $$ = token::TOK_CNEQ; } | 
-			 CLT { $$ = token::TOK_CLT; } | 
-			 CLTE { $$ = token::TOK_CLTE; } | 
-			 CGT { $$ = token::TOK_CGT; } | 
-			 CGTE { $$ = token::TOK_CGTE; } | 
-			 PLUS { $$ = token::TOK_PLUS; } | 
-			 MINUS { $$ = token::TOK_MINUS; } | 
-			 MUL { $$ = token::TOK_MUL; } | 
-			 DIV { $$ = token::TOK_DIV; }
-		   ;
+comparison : 
+	CEQ { $$ = token::TOK_CEQ; } 
+| 	CNEQ { $$ = token::TOK_CNEQ; } 
+|	CLT { $$ = token::TOK_CLT; } 
+|	CLTE { $$ = token::TOK_CLTE; } 
+| 	CGT { $$ = token::TOK_CGT; } 
+| 	CGTE { $$ = token::TOK_CGTE; } 
+|	PLUS { $$ = token::TOK_PLUS; } 
+|	MINUS { $$ = token::TOK_MINUS; } 
+| 	MUL { $$ = token::TOK_MUL; } 
+|	DIV { $$ = token::TOK_DIV; }
+;
 
-numeric : INTEGER_CONST { 
-				$$ = std::move(std::shared_ptr<NExpression>(new NIntegerConst($1))); 
-		}
-		| DOUBLE_CONST { 
-				$$ = std::move(std::shared_ptr<NExpression>(new NDoubleConst($1))); 
-		}
-		;
+numeric : 
+	INTEGER_CONST { $$ = std::move(std::shared_ptr<NExpression>(new NIntegerConst($1))); }
+|	DOUBLE_CONST { $$ = std::move(std::shared_ptr<NExpression>(new NDoubleConst($1))); }
+;
 
-ident : "identifier" { 
-			$$ = std::move(std::shared_ptr<NIdentifier>(new NIdentifier($1))); 
-		}
-	    ;
+ident : 
+	"identifier" { $$ = std::move(std::shared_ptr<NIdentifier>(new NIdentifier($1))); }
+;
 
 %%
 
