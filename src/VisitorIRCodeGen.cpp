@@ -15,6 +15,20 @@ using namespace llvm;
 #undef LOG_TAG
 #define LOG_TAG "VisitorIRCodeGen"
 
+bool VisitorIRCodeGen::isIdentifierInGlobalScope(const std::string& identifier, Function* function, llvm::BasicBlock*& inBlock) {
+    bool isInGlobalSymTable = false;
+    for (auto funcBlockIter = function->begin(); funcBlockIter != function->end(); ++funcBlockIter) {
+        auto IRblock = mCtx.getIRCodeGenBlock(funcBlockIter);
+        if (IRblock->isInLocalSymTable(identifier)) {
+            isInGlobalSymTable = true;
+            inBlock = funcBlockIter;
+            break;
+        }
+    }
+    return isInGlobalSymTable;
+}
+
+
 void VisitorIRCodeGen::visit(struct NIntegerConst *aConst, void* val) {
     Log::info(LOG_TAG, "Constructing NIntegerConst");
     llvm::Value** retVal = (llvm::Value**)val;
@@ -110,10 +124,22 @@ void VisitorIRCodeGen::visit(class NIdentifier *identifier, void *val) {
     Log::info(LOG_TAG, "Constructing NIdentifier");
     llvm::Value** retVal = (llvm::Value**)val;
 
-    bool isDeclared = mCtx.topBlock()->isInLocalSymTable(identifier->mVal);
-    if (!isDeclared) {
-        Log::error(LOG_TAG, "Variable \"{}\" was not declared", identifier->mVal);
+    bool isInLocalSymTable = mCtx.topBlock()->isInLocalSymTable(identifier->mVal);
+    if (!isInLocalSymTable) {
+
+        // Check in the current function in top level blocks
+        auto function = mCtx.topBlock()->mLlvmBlock->getParent();
+        BasicBlock* topLevelBlock;
+        bool isInGlobalSymTable = isIdentifierInGlobalScope(identifier->mVal, function, topLevelBlock);
+        if (isInGlobalSymTable) {
+            auto loadInstVal = new LoadInst(mCtx.getIRCodeGenBlock(topLevelBlock)->mSymTable[identifier->mVal], "__tmp_val", topLevelBlock);
+            *retVal = loadInstVal;
+            return;
+        }
+
+        Log::error(LOG_TAG, "Unknown variable \"{}\".", identifier->mVal);
         exit(EXIT_FAILURE);
+
     } else {
         auto loadInstVal = new LoadInst(mCtx.topBlock()->mSymTable[identifier->mVal], "__tmp_val", mCtx.topBlock()->mLlvmBlock);
         *retVal = loadInstVal;
@@ -122,20 +148,26 @@ void VisitorIRCodeGen::visit(class NIdentifier *identifier, void *val) {
 
 void VisitorIRCodeGen::visit(class NAssignment *assignment, void *val) {
     Log::info(LOG_TAG, "Constructing NAssignment");
-    llvm::Value** retVal = (llvm::Value**)val;
+    llvm::Value **retVal = (llvm::Value **) val;
 
     // Check whether the variable is in the namespace
-    bool isDeclared = mCtx.topBlock()->isInLocalSymTable(assignment->mLhs->mVal);
-    if (!isDeclared) {
-        Log::error(LOG_TAG, "Variable \"{}\" was not declared", assignment->mLhs->mVal);
-        exit(EXIT_FAILURE);
-    } else {
+    bool isInLocalSymTable = mCtx.topBlock()->isInLocalSymTable(assignment->mLhs->mVal);
+    BasicBlock *scopeBblock = mCtx.topBlock()->mLlvmBlock;
+    if (!isInLocalSymTable) {
+        bool isInGlobalSymTable = isIdentifierInGlobalScope(assignment->mLhs->mVal,
+                                                            mCtx.topBlock()->mLlvmBlock->getParent(), scopeBblock);
+        if (!isInGlobalSymTable) {
+            Log::error(LOG_TAG, "Variable \"{}\" was not declared", assignment->mLhs->mVal);
+            exit(EXIT_FAILURE);
+        }
+
         // Generate Value* for an rhs
         auto rvalExprVal = mCtx.stubVal();
         assignment->mRhs->accept(*this, &rvalExprVal);
 
         // Generate store Value*
-        auto storeInstVal = new StoreInst(rvalExprVal, mCtx.topBlock()->mSymTable[assignment->mLhs->mVal], false,
+        auto storeInstVal = new StoreInst(rvalExprVal,
+                                          mCtx.getIRCodeGenBlock(scopeBblock)->mSymTable[assignment->mLhs->mVal], false,
                                           mCtx.topBlock()->mLlvmBlock);
 
         *retVal = storeInstVal;
@@ -258,7 +290,10 @@ void VisitorIRCodeGen::visit(class NBinaryOp *op, void *val) {
 
             // Int32 comparison
             } else if (L->getType()->isIntegerTy()) {
-                *retVal = mCtx.builder().CreateICmp(ICmpInst::FCMP_OLT, L, R, "__tmp_val_clt");
+                Log::error(LOG_TAG, "HERE");
+
+                *retVal = ICmpInst::Create(Instruction::ICmp, ICmpInst::ICMP_SLT, L, R, "__tmp_val_clt", mCtx.topBlock()->mLlvmBlock);
+               // *retVal = mCtx.builder().CreateICmp(ICmpInst::ICMP_SLT, L, R, "__tmp_val_clt");
 
             // Double comparison
             } else if (L->getType()->isDoubleTy()) {
@@ -281,19 +316,104 @@ void VisitorIRCodeGen::visit(class NReturnStatement *statement, void *val) {
 
     statement->mExpression->accept(*this, val);
 
-    auto returnInst = mCtx.builder().CreateRet((Value*)val);
-    returnInst->Create(getGlobalContext(), *(Value**)val, mCtx.topBlock()->mLlvmBlock);
-
-    auto funcTypeId = mCtx.topBlock()->mLlvmBlock->getParent()->getReturnType()->getTypeID();/*getType()->getTypeID();*/
+    // auto returnInst = mCtx.builder().CreateRet((Value*)val);
+    auto funcTypeId = mCtx.topBlock()->mLlvmBlock->getParent()->getReturnType()->getTypeID();
     auto exprTypeId = (*(Value**)val)->getType()->getTypeID();
 
     if (funcTypeId != exprTypeId) {
         Log::error(LOG_TAG, "Function and return expression types are not equal: {} {}", funcTypeId, exprTypeId);
         exit(EXIT_FAILURE);
     }
+
+    *retVal = ReturnInst::Create(getGlobalContext(), *(Value**)val, mCtx.topBlock()->mLlvmBlock);
 }
 
 void VisitorIRCodeGen::visit(struct NExpressionStatement *statement, void* val) {
     Log::info(LOG_TAG, "Constructing NExpressionStatement");
     statement->mExpression->accept(*this, val);
+}
+
+void VisitorIRCodeGen::visit(struct NIfElseStatement *statement, void* val) {
+    Log::info(LOG_TAG, "Constructing NIfElseStatement");
+    llvm::Value** retVal = (llvm::Value**)val;
+
+    auto function = mCtx.topBlock()->mLlvmBlock->getParent();
+
+    // Evaluate expression
+    statement->mCondExpression->accept(*this, val);
+    auto exprEvalResult = mCtx.builder().CreateICmpNE(*(Value**)val, ConstantInt::get(getGlobalContext(), APInt(32, 0)), "__tmp_ifcond");
+
+    // Create blocks for the then and else cases. Insert the 'then' block at the end of the function.
+    BasicBlock *thenBB =
+            BasicBlock::Create(getGlobalContext(), "then", function);
+    BasicBlock *elseBB = BasicBlock::Create(getGlobalContext(), "else");
+    BasicBlock *mergeBB = BasicBlock::Create(getGlobalContext(), "ifcont");
+
+    // Generate if expression
+    mCtx.builder().SetInsertPoint(mCtx.topBlock()->mLlvmBlock);
+    mCtx.builder().CreateCondBr(exprEvalResult, thenBB, elseBB);
+
+    mCtx.popBlock();
+
+    // Deal with "then" block
+    mCtx.pushBlock(thenBB);
+    mCtx.builder().SetInsertPoint(thenBB);
+    statement->mIfBlock->accept(*this, val);
+    mCtx.builder().CreateBr(mergeBB);
+    mCtx.popBlock();
+
+    // Deal with "else" block
+    function->getBasicBlockList().push_back(elseBB);
+    mCtx.pushBlock(elseBB);
+    mCtx.builder().SetInsertPoint(elseBB);
+    if (statement->mElseBlock)
+        statement->mElseBlock->accept(*this, val);
+    mCtx.builder().CreateBr(mergeBB);
+    mCtx.popBlock();
+
+    // Deal with "merge" block
+    function->getBasicBlockList().push_back(mergeBB);
+    mCtx.builder().SetInsertPoint(mergeBB);
+    mCtx.pushBlock(mergeBB);
+}
+
+void VisitorIRCodeGen::visit(struct NForLoop *statement, void* val) {
+    Log::info(LOG_TAG, "Constructing NForLoop");
+    llvm::Value** retVal = (llvm::Value**)val;
+
+    auto function = mCtx.topBlock()->mLlvmBlock->getParent();
+
+   // mCtx.pushBlock(mCtx.topBlock()->mLlvmBlock); // FIXME : set this for BinaryOp code generation was successfull as it uses builder
+
+    auto startVal = mCtx.stubVal();
+    auto stepVal = mCtx.stubVal();
+
+    statement->mStart->accept(*this, &startVal);
+    statement->mStep->accept(*this, &stepVal);
+
+    // Creating "loop" block
+    BasicBlock *loopBB = BasicBlock::Create(getGlobalContext(), "loop", function);
+    mCtx.builder().SetInsertPoint(mCtx.topBlock()->mLlvmBlock);
+    //bmCtx.mCheckVarDefinition = false;
+
+    mCtx.builder().CreateBr(loopBB);
+
+    mCtx.pushBlock(loopBB);
+    mCtx.builder().SetInsertPoint(loopBB);
+
+    // Generating code for loop body
+    statement->mBlock->accept(*this, val);
+
+    // Incrementing "start" value
+    auto counter = mCtx.builder().CreateAdd(startVal, stepVal, "__tmp_counter");
+
+    // Bfranching to afterloop if condition is true
+    auto endVal = mCtx.stubVal();
+    statement->mEnd->accept(*this, &endVal);
+    BasicBlock *afterBB = BasicBlock::Create(getGlobalContext(), "afterloop", function);
+    mCtx.builder().CreateCondBr(endVal, loopBB, afterBB);
+
+    mCtx.popBlock();
+    mCtx.pushBlock(afterBB);
+    mCtx.builder().SetInsertPoint(afterBB);
 }

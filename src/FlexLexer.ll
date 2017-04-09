@@ -51,6 +51,12 @@ blank [ \t]+
 "*" { return yy::BisonParser::make_MUL(); }
 "/" { return yy::BisonParser::make_DIV(); }
 ";" { return yy::BisonParser::make_SEMICOLON(); }
+
+"if" { return yy::BisonParser::make_IF(); }
+"else" { return yy::BisonParser::make_ELSE(); }
+
+"for" { return yy::BisonParser::make_FOR(); }
+
 "return" { return yy::BisonParser::make_RETURN(); }
 
 {int} { return yy::BisonParser::make_INTEGER_CONST(yytext); }

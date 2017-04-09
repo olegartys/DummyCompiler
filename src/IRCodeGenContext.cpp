@@ -33,7 +33,7 @@ void IRCodeGenContext::genIRCode(NBlock& rootBlock) {
     BasicBlock* bblock = BasicBlock::Create(getGlobalContext(), mGlobalFunction->getName(), mGlobalFunction);
 
     pushBlock(bblock);
-    //mBuilder->SetInsertPoint(bblock); // Set root block for builder to insert instructions
+    // mBuilder->SetInsertPoint(bblock); // Set root block for builder to insert instructions
     auto stub = stubVal();
     rootBlock.accept(*mVisitorIRCodeGen, &(stub)); // FIXME: this is stub for creatng some empty value. Is this correct?
     popBlock();

@@ -17,6 +17,8 @@ public:
 
     virtual ~VisitorIRCodeGen() override = default;
 
+    virtual bool isIdentifierInGlobalScope (const std::string& val, llvm::Function* f, llvm::BasicBlock*& inBlock);
+
     virtual void visit(struct NIntegerConst *aConst, void* val = nullptr) override;
 
     virtual void visit(struct NDoubleConst *aConst, void* val = nullptr) override;
@@ -38,6 +40,10 @@ public:
     virtual void visit(struct NBinaryOp *op, void* val = nullptr) override;
 
     virtual void visit(struct NReturnStatement *statement, void* val = nullptr) override;
+
+    virtual void visit(class NIfElseStatement *statement, void* val = nullptr) override;
+
+    virtual void visit(class NForLoop *loop, void *pVoid) override;
 
 private:
     IRCodeGenContext& mCtx;

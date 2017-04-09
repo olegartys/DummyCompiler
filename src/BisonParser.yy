@@ -41,18 +41,26 @@ class CompilerContext;
 	CLTE "<="
 	CGT ">"
 	CGTE ">="
+	
 	LPAREN "("
 	RPAREN ")"
 	LBRACE "{"
 	RBRACE "}"
+	
 	DOT "."
 	COMMA ","
 	PLUS "+"
 	MINUS "-"
 	MUL "*"
 	DIV "/"
+	
 	RETURN "return"
 	SEMICOLON ";"
+	
+	IF "if"
+	ELSE "else"
+	
+	FOR "for"
 ;
 
 %token <std::string> INTEGER_CONST "integer"
@@ -60,7 +68,7 @@ class CompilerContext;
 
 %token <std::string> IDENTIFIER "identifier"
 
-%type <std::shared_ptr<NStatement>> stmt var_decl func_decl return_statement
+%type <std::shared_ptr<NStatement>> stmt var_decl func_decl return_statement if_statement for_loop_statement
 %type <std::shared_ptr<NExpression>> expr assignment function_call
 %type <std::shared_ptr<NExpression>> numeric
 %type <std::shared_ptr<NIdentifier>> ident
@@ -92,6 +100,8 @@ stmt :
 	var_decl { $$ = $1; } 
 | 	func_decl { $$ = $1; }
 | 	return_statement { $$ = $1; }
+|	if_statement { $$ = $1; }
+|	for_loop_statement { $$ = $1; }
 | 	expr { $$ = std::move(std::shared_ptr<NExpressionStatement>(new NExpressionStatement($1))); }
 ;
 
@@ -123,7 +133,16 @@ expr :
 | 	LPAREN expr RPAREN { $$ = $2; }
 | 	numeric { $$ = $1; }
 ;
-	 
+
+if_statement : 
+	"if" "(" expr ")" block { $$ = std::move(std::shared_ptr<NIfElseStatement>(new NIfElseStatement($3, $5))); }
+|	"if" "(" expr ")" block "else" block { $$ = std::move(std::shared_ptr<NIfElseStatement>(new NIfElseStatement($3, $5, $7))); }
+;
+
+for_loop_statement : 
+	"for" "(" ident ";" expr ";" expr ")" block { $$ = std::move(std::shared_ptr<NForLoop>(new NForLoop($3, $5, $7, $9))); }
+;
+
 return_statement : 
 	RETURN expr { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); }
 // | 	RETURN numeric { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); } 

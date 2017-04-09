@@ -174,13 +174,7 @@ public:
 
 class NReturnStatement : public NStatement {
 public:
-    // std::shared_ptr<NIdentifier> mReturnIdent;
     std::shared_ptr<NExpression> mExpression;
-
-//    NReturnStatement(std::shared_ptr<NIdentifier>& returnIdent) :
-//            mReturnIdent(returnIdent) {
-//        Log::info(LOG_TAG, "[NReturnStatement] created");
-//    }
 
     NReturnStatement(std::shared_ptr<NExpression>& expression) :
             mExpression(expression) {
@@ -189,5 +183,43 @@ public:
 
     virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
+
+class NIfElseStatement : public NStatement {
+public:
+    std::shared_ptr<NExpression> mCondExpression;
+    std::shared_ptr<NBlock> mIfBlock;
+    std::shared_ptr<NBlock> mElseBlock;
+
+    NIfElseStatement(std::shared_ptr<NExpression>& expression, std::shared_ptr<NBlock>& ifBlock) :
+            mCondExpression(expression), mIfBlock(ifBlock), mElseBlock(nullptr) {
+        Log::info(LOG_TAG, "[NIfElseStatement] created");
+    }
+
+    NIfElseStatement(std::shared_ptr<NExpression>& expression, std::shared_ptr<NBlock>& ifBlock,
+                     std::shared_ptr<NBlock>& elseBlock) :
+            mCondExpression(expression), mIfBlock(ifBlock), mElseBlock(elseBlock) {
+        Log::info(LOG_TAG, "[NIfElseStatement] created");
+    }
+
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
+};
+
+class NForLoop : public NStatement {
+public:
+    std::shared_ptr<NIdentifier> mStart;
+    std::shared_ptr<NExpression> mEnd;
+    std::shared_ptr<NExpression> mStep;
+
+    std::shared_ptr<NBlock> mBlock;
+
+    NForLoop(std::shared_ptr<NIdentifier>& start, std::shared_ptr<NExpression>& end, std::shared_ptr<NExpression>& step,
+             std::shared_ptr<NBlock>& block) :
+            mStart(start), mEnd(end), mStep(step), mBlock(block) {
+        Log::info(LOG_TAG, "[NForLoop] created");
+    }
+
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
+};
+
 
 #endif //DUMMYCOMPILER_NODE_H

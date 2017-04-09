@@ -52,6 +52,23 @@ public:
     Ptr<IRCodeGenBlock>& topBlock() { return mBlockList.back(); }
     std::map<std::string, llvm::Value*>& topSymTable() { return mBlockList.back()->mSymTable; }
 
+    Ptr<IRCodeGenBlock>& getIRCodeGenBlock(llvm::BasicBlock* reqBlock) {
+        for (auto& block: mBlockList) {
+            if (block->mLlvmBlock == reqBlock) {
+                return block;
+            }
+        }
+    }
+
+    bool isInGlobalSymTable(const std::string& val) {
+        for (const auto& block: mBlockList) {
+            if (block->isInLocalSymTable(val)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // FIXME: check nullptr
     void pushBlock(llvm::BasicBlock* block) { Ptr<IRCodeGenBlock> b = std::make_shared<IRCodeGenBlock>(); b->mLlvmBlock = block; mBlockList.push_back(b); }
     void popBlock() { if (!mBlockList.empty()) mBlockList.pop_back(); }
@@ -60,15 +77,18 @@ public:
 
     llvm::IRBuilder<>& builder() { return *mBuilder; }
     llvm::Module& module() { return *mModule; }
-    llvm::Value* stubVal() const { auto val = llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm::getGlobalContext()), 2281488); return val; }
+    llvm::Value* stubVal() const { auto val = llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvm::getGlobalContext()), 2281488); return val; }
 
     virtual void genIRCode(NBlock& rootBlock);
 
     /** Helpers **/
     virtual const llvm::Type* getTypeOf(const std::string& type) const;
 
+    bool mCheckVarDefinition = true; // The biggest crutch i have ever used
+
 protected:
     std::list<Ptr<IRCodeGenBlock>> mBlockList;
+
     llvm::Function* mGlobalFunction;
     llvm::Module* mModule;
 

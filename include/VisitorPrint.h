@@ -82,11 +82,27 @@ public:
 
     void visit(class NReturnStatement *statement, void* = nullptr) override {
         Log::info(LOG_TAG, "[NReturnStatement]: visited");
-//        if (statement->mReturnIdent)
-//            statement->mReturnIdent->accept(*this);
         if (statement->mExpression)
             statement->mExpression->accept(*this);
     }
+
+    virtual void visit(class NIfElseStatement *statement, void* = nullptr) override {
+        Log::info(LOG_TAG, "[NIfElseStatement]: visited");
+        statement->mCondExpression->accept(*this);
+        statement->mIfBlock->accept(*this);
+        if (statement->mElseBlock) {
+            statement->mElseBlock->accept(*this);
+        }
+    }
+
+    virtual void visit(class NForLoop *loop, void* = nullptr) override {
+        Log::info(LOG_TAG, "[NForLoop]: visited");
+        loop->mStart->accept(*this);
+        loop->mEnd->accept(*this);
+        loop->mStep->accept(*this);
+        loop->mBlock->accept(*this);
+    }
+
 };
 
 #endif //DUMMYCOMPILER_VISITORPRINT_H

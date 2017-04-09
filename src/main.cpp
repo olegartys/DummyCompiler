@@ -17,7 +17,7 @@ int main() {
     VisitorPrint visitorPrint;
 
     try {
-        ctx = std::make_shared<CompilerContext>("test"/*, "test.out"*/);
+        ctx = std::make_shared<CompilerContext>("for_test"/*, "test.out"*/);
     } catch (std::runtime_error& e) {
         Log::error(LOG_TAG, "{}", e.what());
         exit(EXIT_FAILURE);
