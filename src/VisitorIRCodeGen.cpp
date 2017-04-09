@@ -112,12 +112,12 @@ void VisitorIRCodeGen::visit(struct NBlock *block, void* val) {
     Log::info(LOG_TAG, "Constructing NBlock");
     llvm::Value** retVal = (llvm::Value**)val;
 
-    llvm::Value* lastVal = nullptr;
+    // llvm::Value* lastVal = nullptr;
     for (const auto& st: block->mStatements) {
-        st->accept(*this, &lastVal);
+        st->accept(*this, val);
     }
 
-    *retVal = lastVal;
+    // *retVal = lastVal;
 }
 
 void VisitorIRCodeGen::visit(class NIdentifier *identifier, void *val) {
@@ -132,7 +132,7 @@ void VisitorIRCodeGen::visit(class NIdentifier *identifier, void *val) {
         BasicBlock* topLevelBlock;
         bool isInGlobalSymTable = isIdentifierInGlobalScope(identifier->mVal, function, topLevelBlock);
         if (isInGlobalSymTable) {
-            auto loadInstVal = new LoadInst(mCtx.getIRCodeGenBlock(topLevelBlock)->mSymTable[identifier->mVal], "__tmp_val", topLevelBlock);
+            auto loadInstVal = new LoadInst(mCtx.getIRCodeGenBlock(topLevelBlock)->mSymTable[identifier->mVal], "__tmp_val",  mCtx.topBlock()->mLlvmBlock);
             *retVal = loadInstVal;
             return;
         }
@@ -160,18 +160,18 @@ void VisitorIRCodeGen::visit(class NAssignment *assignment, void *val) {
             Log::error(LOG_TAG, "Variable \"{}\" was not declared", assignment->mLhs->mVal);
             exit(EXIT_FAILURE);
         }
-
-        // Generate Value* for an rhs
-        auto rvalExprVal = mCtx.stubVal();
-        assignment->mRhs->accept(*this, &rvalExprVal);
-
-        // Generate store Value*
-        auto storeInstVal = new StoreInst(rvalExprVal,
-                                          mCtx.getIRCodeGenBlock(scopeBblock)->mSymTable[assignment->mLhs->mVal], false,
-                                          mCtx.topBlock()->mLlvmBlock);
-
-        *retVal = storeInstVal;
     }
+
+    // Generate Value* for an rhs
+    auto rvalExprVal = mCtx.stubVal();
+    assignment->mRhs->accept(*this, &rvalExprVal);
+
+    // Generate store Value*
+    auto storeInstVal = new StoreInst(rvalExprVal,
+                                      mCtx.getIRCodeGenBlock(scopeBblock)->mSymTable[assignment->mLhs->mVal], false,
+                                      mCtx.topBlock()->mLlvmBlock);
+
+    *retVal = storeInstVal;
 }
 
 void VisitorIRCodeGen::visit(class NFunctionDeclaration *declaration, void *val) {
@@ -271,13 +271,13 @@ void VisitorIRCodeGen::visit(class NBinaryOp *op, void *val) {
     // FIXME: only double arithmetic
     switch (op->mOp) {
         case yy::BisonParser::token::TOK_PLUS:
-            *retVal = mCtx.builder().CreateFAdd(L, R, "__tmp_val_add");
+            *retVal = mCtx.builder().CreateAdd(L, R, "__tmp_val_add");
             break;
         case yy::BisonParser::token::TOK_MINUS:
-            *retVal =  mCtx.builder().CreateFSub(L, R, "__tmp_val_sub");
+            *retVal =  mCtx.builder().CreateSub(L, R, "__tmp_val_sub");
             break;
         case yy::BisonParser::token::TOK_MUL:
-            *retVal = mCtx.builder().CreateFMul(L, R, "__tmp_val_mul");
+            *retVal = mCtx.builder().CreateMul(L, R, "__tmp_val_mul");
             break;
         case yy::BisonParser::token::TOK_DIV:
             *retVal = mCtx.builder().CreateFDiv(L, R, "__tmp_val_div");
@@ -290,7 +290,8 @@ void VisitorIRCodeGen::visit(class NBinaryOp *op, void *val) {
 
             // Int32 comparison
             } else if (L->getType()->isIntegerTy()) {
-                Log::error(LOG_TAG, "HERE");
+                Log::error(LOG_TAG, "HERE {} {}", L->getType()->getTypeID(), R->getType()->getTypeID());
+
 
                 *retVal = ICmpInst::Create(Instruction::ICmp, ICmpInst::ICMP_SLT, L, R, "__tmp_val_clt", mCtx.topBlock()->mLlvmBlock);
                // *retVal = mCtx.builder().CreateICmp(ICmpInst::ICMP_SLT, L, R, "__tmp_val_clt");
@@ -339,9 +340,8 @@ void VisitorIRCodeGen::visit(struct NIfElseStatement *statement, void* val) {
 
     auto function = mCtx.topBlock()->mLlvmBlock->getParent();
 
-    // Evaluate expression
+    // Evaluate expression in variable var
     statement->mCondExpression->accept(*this, val);
-    auto exprEvalResult = mCtx.builder().CreateICmpNE(*(Value**)val, ConstantInt::get(getGlobalContext(), APInt(32, 0)), "__tmp_ifcond");
 
     // Create blocks for the then and else cases. Insert the 'then' block at the end of the function.
     BasicBlock *thenBB =
@@ -351,7 +351,7 @@ void VisitorIRCodeGen::visit(struct NIfElseStatement *statement, void* val) {
 
     // Generate if expression
     mCtx.builder().SetInsertPoint(mCtx.topBlock()->mLlvmBlock);
-    mCtx.builder().CreateCondBr(exprEvalResult, thenBB, elseBB);
+    mCtx.builder().CreateCondBr(*(Value**)val, thenBB, elseBB);
 
     mCtx.popBlock();
 
@@ -413,7 +413,6 @@ void VisitorIRCodeGen::visit(struct NForLoop *statement, void* val) {
     BasicBlock *afterBB = BasicBlock::Create(getGlobalContext(), "afterloop", function);
     mCtx.builder().CreateCondBr(endVal, loopBB, afterBB);
 
-    mCtx.popBlock();
     mCtx.pushBlock(afterBB);
     mCtx.builder().SetInsertPoint(afterBB);
 }

@@ -60,15 +60,6 @@ public:
         }
     }
 
-    bool isInGlobalSymTable(const std::string& val) {
-        for (const auto& block: mBlockList) {
-            if (block->isInLocalSymTable(val)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     // FIXME: check nullptr
     void pushBlock(llvm::BasicBlock* block) { Ptr<IRCodeGenBlock> b = std::make_shared<IRCodeGenBlock>(); b->mLlvmBlock = block; mBlockList.push_back(b); }
     void popBlock() { if (!mBlockList.empty()) mBlockList.pop_back(); }
