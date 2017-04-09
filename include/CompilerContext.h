@@ -11,6 +11,7 @@
 #endif
 
 #include "../src/flex_bison_output/BisonParser.hpp"
+#include "IRCodeGenContext.h"
 
 #define YY_DECL \
     yy::BisonParser::symbol_type yylex (CompilerContext& d)
@@ -19,7 +20,7 @@ YY_DECL;
 
 class CompilerContext {
 public:
-    CompilerContext(const std::string& inputPath = "");
+    CompilerContext(const std::string& inputPath = "", const std::string& outputPath = "");
 
     CompilerContext(const CompilerContext&) = delete;
     CompilerContext& operator= (const CompilerContext&) = delete;
@@ -45,13 +46,20 @@ public:
         mBisonParser.parse();
     }
 
+    virtual void genIRLLVMCode() {
+        mCodeGenCtx->genIRCode(*mRootASTBlock);
+    }
 
 protected:
+    std::shared_ptr<IRCodeGenContext> mCodeGenCtx;
     yy::BisonParser mBisonParser;
 
     std::shared_ptr<NBlock> mRootASTBlock;
+
     std::string mInputPath;
     FILE* mInputFile;
+    std::string mOutputPath;
+    FILE* mOutputFile;
 
 };
 

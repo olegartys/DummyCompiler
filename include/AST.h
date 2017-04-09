@@ -10,6 +10,7 @@
 #include <Log.h>
 #include "IVisitor.h"
 
+#undef LOG_TAG
 #define LOG_TAG "AST"
 
 class NVariableDeclaration;
@@ -24,7 +25,7 @@ class BaseNode {
 public:
     virtual ~BaseNode() = default;
 
-    virtual void accept(IVisitor& v) = 0;
+    virtual void accept(IVisitor& v, void* usr = nullptr) = 0;
 };
 
 class NExpression : public BaseNode { };
@@ -39,7 +40,7 @@ public:
         Log::info(LOG_TAG, "[NIntegerConst] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 class NDoubleConst : public NExpression {
@@ -50,7 +51,7 @@ public:
         Log::info(LOG_TAG, "[NDoubleConst] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 class NIdentifier : public NExpression {
@@ -61,7 +62,7 @@ public:
         Log::info(LOG_TAG, "[NIdentifier] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 class NVariableDeclaration : public NStatement {
@@ -81,7 +82,7 @@ public:
         Log::info(LOG_TAG, "[NVariableDeclaration] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 class NBlock : public NExpression {
@@ -90,14 +91,14 @@ public:
 
     NBlock() { Log::info(LOG_TAG, "[NBlock] created"); }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 
 };
 
 class NAssignment : public NExpression {
 public:
     int mOp;
-    std::shared_ptr<NExpression> mLhs;
+    std::shared_ptr<NIdentifier> mLhs;
     std::shared_ptr<NExpression> mRhs;
 
     NAssignment(std::shared_ptr<NIdentifier>& lhs, std::shared_ptr<NExpression>& rhs) :
@@ -105,7 +106,7 @@ public:
         Log::info(LOG_TAG, "[NAssignment] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 
 };
 
@@ -123,7 +124,7 @@ public:
         Log::info(LOG_TAG, "[NFunctionDeclaration] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 
 };
 
@@ -142,7 +143,7 @@ public:
         Log::info(LOG_TAG, "[NFunctionCall] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 class NExpressionStatement : public NStatement {
@@ -154,7 +155,7 @@ public:
         Log::info(LOG_TAG, "[NExpressionStatement] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 class NBinaryOp : public NExpression {
@@ -168,25 +169,25 @@ public:
         Log::info(LOG_TAG, "[NBinaryOp] created");
     }
 
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 class NReturnStatement : public NStatement {
 public:
-    std::shared_ptr<NIdentifier> mReturnIdent;
-    std::shared_ptr<NExpression> mNumericVal;
+    // std::shared_ptr<NIdentifier> mReturnIdent;
+    std::shared_ptr<NExpression> mExpression;
 
-    NReturnStatement(std::shared_ptr<NIdentifier>& returnIdent) :
-            mReturnIdent(returnIdent) {
+//    NReturnStatement(std::shared_ptr<NIdentifier>& returnIdent) :
+//            mReturnIdent(returnIdent) {
+//        Log::info(LOG_TAG, "[NReturnStatement] created");
+//    }
+
+    NReturnStatement(std::shared_ptr<NExpression>& expression) :
+            mExpression(expression) {
         Log::info(LOG_TAG, "[NReturnStatement] created");
     }
 
-    NReturnStatement(std::shared_ptr<NExpression>& numericVal) :
-            mNumericVal(numericVal) {
-        Log::info(LOG_TAG, "[NReturnStatement] created");
-    }
-
-    virtual void accept(IVisitor& v) override { v.visit(this); }
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
 #endif //DUMMYCOMPILER_NODE_H

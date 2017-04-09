@@ -7,37 +7,40 @@
 
 #include "IVisitor.h"
 
+#undef LOG_TAG
 #define LOG_TAG "VisitorPrint"
 
 class VisitorPrint : public IVisitor {
 public:
     ~VisitorPrint() override = default;
 
-    void visit(struct NIntegerConst *aConst) override {
+    void visit(struct NIntegerConst *aConst, void* = nullptr) override {
         Log::info(LOG_TAG, "[NIntegerConst]: val={}", aConst->mVal);
     }
 
-    void visit(struct NDoubleConst *aConst) override {
+    void visit(struct NDoubleConst *aConst, void* = nullptr) override {
         Log::info(LOG_TAG, "[NDoubleConst]: val={}", aConst->mVal);
     }
 
-    void visit(struct NIdentifier *identifier) override {
+    void visit(struct NIdentifier *identifier, void* = nullptr) override {
         Log::info(LOG_TAG, "[NIdentifier]: val={}", identifier->mVal);
     }
 
-    void visit(struct NVariableDeclaration *declaration) override {
-        Log::info(LOG_TAG, "[NVariableDeclaration]: type={} id={}", declaration->mType->mVal, declaration->mId->mVal);
+    void visit(struct NVariableDeclaration *declaration, void* = nullptr) override {
+        Log::info(LOG_TAG, "[NVariableDeclaration]: visited", declaration->mType->mVal, declaration->mId->mVal);
+        declaration->mType->accept(*this);
+        declaration->mId->accept(*this);
         if (declaration->mAsignExpr)
             declaration->mAsignExpr->accept(*this);
     }
 
-    void visit(struct NBlock *block) override {
+    void visit(struct NBlock *block, void* = nullptr) override {
         Log::info(LOG_TAG, "[NBlock]: visited");
             for (const auto& arg: block->mStatements)
                 arg->accept(*this);
     }
 
-    void visit(struct NAssignment *assignment) override {
+    void visit(struct NAssignment *assignment, void* = nullptr) override {
         if (assignment->mLhs)
             assignment->mLhs->accept(*this);
         Log::info(LOG_TAG, "[NAssignment]: op={}", assignment->mOp);
@@ -45,28 +48,31 @@ public:
             assignment->mRhs->accept(*this);
     }
 
-    void visit(struct NFunctionDeclaration *declaration) override {
+    void visit(struct NFunctionDeclaration *declaration, void* = nullptr) override {
+        Log::info(LOG_TAG, "[NFunctionDeclaration]: visited");
+        declaration->mType->accept(*this);
+        declaration->mId->accept(*this);
         if (declaration->mArguments)
             for (const auto& arg: *declaration->mArguments)
                 arg->accept(*this);
-        Log::info(LOG_TAG, "[NFunctionDeclaration]: type={} id={}", declaration->mType->mVal, declaration->mId->mVal);
         if (declaration->mBlock)
             declaration->mBlock->accept(*this);
     }
 
-    void visit(struct NFunctionCall *call) override {
+    void visit(struct NFunctionCall *call, void* = nullptr) override {
+        Log::info(LOG_TAG, "[NFunctionCall]: visited");
+        call->mId->accept(*this);
         if (call->mArguments)
             for (const auto& arg: *call->mArguments)
                 arg->accept(*this);
-        Log::info(LOG_TAG, "[NFunctionCall]: id={}", call->mId->mVal);
     }
 
-    void visit(struct NExpressionStatement *statement) override {
+    void visit(struct NExpressionStatement *statement, void* = nullptr) override {
         Log::info(LOG_TAG, "[NExpressionStatement] visited");
         statement->mExpression->accept(*this);
     }
 
-    void visit(struct NBinaryOp *op) override {
+    void visit(struct NBinaryOp *op, void* = nullptr) override {
         if (op->mLhs)
             op->mLhs->accept(*this);
         Log::info(LOG_TAG, "[NBinaryOp]: op={}", op->mOp);
@@ -74,12 +80,12 @@ public:
             op->mRhs->accept(*this);
     }
 
-    void visit(class NReturnStatement *statement) override {
+    void visit(class NReturnStatement *statement, void* = nullptr) override {
         Log::info(LOG_TAG, "[NReturnStatement]: visited");
-        if (statement->mReturnIdent)
-            statement->mReturnIdent->accept(*this);
-        if (statement->mNumericVal)
-            statement->mNumericVal->accept(*this);
+//        if (statement->mReturnIdent)
+//            statement->mReturnIdent->accept(*this);
+        if (statement->mExpression)
+            statement->mExpression->accept(*this);
     }
 };
 

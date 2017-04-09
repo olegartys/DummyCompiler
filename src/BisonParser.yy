@@ -15,6 +15,7 @@
 
 #include <AST.h>
 
+#undef LOG_TAG
 #define LOG_TAG "BisonParser"
 
 class CompilerContext;
@@ -69,7 +70,7 @@ class CompilerContext;
 %type <std::shared_ptr<VariableList>> func_decl_args
 
 // FIXME : is not actually correct. Do sth with rule matching as it is mess
-%type <int> comparison 
+%type <int> binary_op 
 
 %printer { yyoutput << $$; } <*>;
 
@@ -118,14 +119,14 @@ expr :
 	assignment { $$ = $1; }
 | 	function_call { $$ = $1; }
 | 	ident { $$ = $1; }
-| 	expr comparison expr { $$ = std::move(std::shared_ptr<NBinaryOp>(new NBinaryOp($1, $2, $3))); }
+| 	expr binary_op expr { $$ = std::move(std::shared_ptr<NBinaryOp>(new NBinaryOp($1, $2, $3))); }
 | 	LPAREN expr RPAREN { $$ = $2; }
 | 	numeric { $$ = $1; }
 ;
 	 
 return_statement : 
-	RETURN ident { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); }
-| 	RETURN numeric { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); }
+	RETURN expr { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); }
+// | 	RETURN numeric { $$ = std::move(std::shared_ptr<NStatement>(new NReturnStatement($2))); } 
 ;
 	 
 assignment : 
@@ -142,7 +143,7 @@ call_args :
 | 	call_args COMMA expr { $1->push_back($3); $$ = $1; }
 ;
 		  
-comparison : 
+binary_op : 
 	CEQ { $$ = token::TOK_CEQ; } 
 | 	CNEQ { $$ = token::TOK_CNEQ; } 
 |	CLT { $$ = token::TOK_CLT; } 
@@ -168,6 +169,7 @@ ident :
 
 void yy::BisonParser::error(const std::string& err) { 
 	Log::error(LOG_TAG, "Parser error: {}", err);
+	exit(EXIT_FAILURE);
 }
 
 
