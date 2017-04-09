@@ -22,6 +22,9 @@ public:
     virtual void visit(class NReturnStatement*, void* = nullptr) = 0;
     virtual void visit(class NIfElseStatement*, void* = nullptr) = 0;
     virtual void visit(class NForLoop*, void* = nullptr) = 0;
+    virtual void visit(class NStructField*, void* = nullptr) = 0;
+    virtual void visit(class NStructDecl*, void* = nullptr) = 0;
+
 };
 
 #endif //DUMMYCOMPILER_IVISITOR_H

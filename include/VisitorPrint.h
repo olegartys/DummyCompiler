@@ -103,6 +103,17 @@ public:
         loop->mBlock->accept(*this);
     }
 
+    virtual void visit(class NStructField *field, void *pVoid) override {
+        Log::info(LOG_TAG, "[NStructField]: visited. access = {}", field->mAccessSpecifier);
+        field->mDeclaration->accept(*this);
+    }
+
+    virtual void visit(class NStructDecl *decl, void *pVoid) override {
+        Log::info(LOG_TAG, "[NStructDecl]: visited");
+        decl->mIdentifier->accept(*this);
+        decl->mStructFields->accept(*this);
+    }
+
 };
 
 #endif //DUMMYCOMPILER_VISITORPRINT_H

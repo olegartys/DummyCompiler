@@ -45,6 +45,14 @@ public:
 
     virtual void visit(class NForLoop *loop, void *pVoid) override;
 
+    virtual void visit(class NStructField *field, void *pVoid) override {
+
+    }
+
+    virtual void visit(class NStructDecl *decl, void *pVoid) override {
+
+    }
+
 private:
     IRCodeGenContext& mCtx;
 

@@ -57,6 +57,10 @@ blank [ \t]+
 
 "for" { return yy::BisonParser::make_FOR(); }
 
+"struct" { return yy::BisonParser::make_STRUCT(); }
+"private" { return yy::BisonParser::make_PRIVATE(); }
+"public" { return yy::BisonParser::make_PUBLIC(); }
+
 "return" { return yy::BisonParser::make_RETURN(); }
 
 {int} { return yy::BisonParser::make_INTEGER_CONST(yytext); }

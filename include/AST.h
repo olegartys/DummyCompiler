@@ -221,5 +221,32 @@ public:
     virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
 };
 
+class NStructField : public NStatement {
+public:
+    std::shared_ptr<NStatement> mDeclaration;
+    std::string mAccessSpecifier;
+
+    NStructField(const std::string& accessSpecifier, std::shared_ptr<NStatement>& declaration) :
+            mAccessSpecifier(accessSpecifier), mDeclaration(declaration) {
+        Log::info(LOG_TAG, "[NStructField] created");
+    }
+
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
+};
+
+class NStructDecl : public NStatement {
+public:
+    std::shared_ptr<NIdentifier> mIdentifier;
+    std::shared_ptr<NBlock> mStructFields;
+
+    NStructDecl(std::shared_ptr<NIdentifier>& identifier, std::shared_ptr<NBlock>& structFields) :
+            mIdentifier(identifier), mStructFields(structFields) {
+        Log::info(LOG_TAG, "[NStructDecl] created");
+
+    }
+
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
+};
+
 
 #endif //DUMMYCOMPILER_NODE_H

@@ -61,6 +61,10 @@ class CompilerContext;
 	ELSE "else"
 	
 	FOR "for"
+	
+	STRUCT "struct"
+	PRIVATE "private"
+	PUBLIC "public"
 ;
 
 %token <std::string> INTEGER_CONST "integer"
@@ -68,7 +72,9 @@ class CompilerContext;
 
 %token <std::string> IDENTIFIER "identifier"
 
-%type <std::shared_ptr<NStatement>> stmt var_decl func_decl return_statement if_statement for_loop_statement
+%type <std::shared_ptr<NStatement>> stmt var_decl func_decl return_statement if_statement for_loop_statement struct_decl 
+%type <std::shared_ptr<NStatement>> struct_field
+%type <std::shared_ptr<NBlock>> struct_fields
 %type <std::shared_ptr<NExpression>> expr assignment function_call
 %type <std::shared_ptr<NExpression>> numeric
 %type <std::shared_ptr<NIdentifier>> ident
@@ -79,6 +85,7 @@ class CompilerContext;
 
 // FIXME : is not actually correct. Do sth with rule matching as it is mess
 %type <int> binary_op 
+%type <std::string> acess_specifier
 
 %printer { yyoutput << $$; } <*>;
 
@@ -99,10 +106,30 @@ stmts :
 stmt : 
 	var_decl { $$ = $1; } 
 | 	func_decl { $$ = $1; }
+|	struct_decl { $$ = $1; }
 | 	return_statement { $$ = $1; }
 |	if_statement { $$ = $1; }
 |	for_loop_statement { $$ = $1; }
 | 	expr { $$ = std::move(std::shared_ptr<NExpressionStatement>(new NExpressionStatement($1))); }
+;
+
+struct_decl :
+	"struct" ident "{" struct_fields "}" { $$ = std::move(std::shared_ptr<NStructDecl>(new NStructDecl($2, $4))); }
+;
+
+struct_fields : 
+	struct_field { $$ = std::move(std::shared_ptr<NBlock>(new NBlock())); $$->mStatements.push_back($1); }
+|	struct_fields struct_field { $1->mStatements.push_back($2); $$ = $1; }
+;
+
+struct_field :
+	acess_specifier var_decl { $$ = std::move(std::shared_ptr<NStructField>(new NStructField($1, $2))); }
+|	acess_specifier func_decl { $$ = std::move(std::shared_ptr<NStructField>(new NStructField($1, $2))); }
+;
+
+acess_specifier :
+	"private" { $$ = "private"; }
+|	"public" { $$ = "public"; }
 ;
 
 func_decl : 
