@@ -12,12 +12,21 @@ void printAST(VisitorPrint& vp, NBlock& rootASTblock) {
     }
 }
 
-int main() {
+void usage(const char* progName) {
+    Log::error(LOG_TAG, "Usage: {} [inputFile] [outputFile]", progName);
+}
+
+int main(int argc, char** argv) {
     std::shared_ptr<CompilerContext> ctx;
     VisitorPrint visitorPrint;
 
+    if (argc != 3) {
+        usage(argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
     try {
-        ctx = std::make_shared<CompilerContext>("struct_test"/*, "test.out"*/);
+        ctx = std::make_shared<CompilerContext>(argv[1], argv[2]);
     } catch (std::runtime_error& e) {
         Log::error(LOG_TAG, "{}", e.what());
         exit(EXIT_FAILURE);

@@ -101,8 +101,15 @@ public:
     std::shared_ptr<NIdentifier> mLhs;
     std::shared_ptr<NExpression> mRhs;
 
+    std::shared_ptr<NStructFieldAccess> mStructField;
+
     NAssignment(std::shared_ptr<NIdentifier>& lhs, std::shared_ptr<NExpression>& rhs) :
             mLhs(lhs), mRhs(rhs) {
+        Log::info(LOG_TAG, "[NAssignment] created");
+    }
+
+    NAssignment(std::shared_ptr<NStructFieldAccess>& lhs, std::shared_ptr<NExpression>& rhs) :
+            mStructField(lhs), mRhs(rhs) {
         Log::info(LOG_TAG, "[NAssignment] created");
     }
 
@@ -246,6 +253,33 @@ public:
     }
 
     virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
+};
+
+class NStructFieldAccess : public NExpression {
+public:
+    std::shared_ptr<NIdentifier> mStructName;
+    std::shared_ptr<NIdentifier> mFieldName;
+
+    NStructFieldAccess(std::shared_ptr<NIdentifier>& structName, std::shared_ptr<NIdentifier>& fieldName) :
+            mStructName(structName), mFieldName(fieldName) {
+        Log::info(LOG_TAG, "[NStructFieldAccess] created");
+    }
+
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
+};
+
+class NStructMethodCall : public NExpression {
+public:
+    std::shared_ptr<NIdentifier> mStructName;
+    std::shared_ptr<NExpression> mMethodCall;
+
+    NStructMethodCall(std::shared_ptr<NIdentifier>& structName, std::shared_ptr<NExpression>& methodCall) :
+            mStructName(structName), mMethodCall(methodCall) {
+        Log::info(LOG_TAG, "[NStructMethodCall] created");
+    }
+
+    virtual void accept(IVisitor& v, void* usr = nullptr) override { v.visit(this, usr); }
+
 };
 
 

@@ -75,7 +75,8 @@ class CompilerContext;
 %type <std::shared_ptr<NStatement>> stmt var_decl func_decl return_statement if_statement for_loop_statement struct_decl 
 %type <std::shared_ptr<NStatement>> struct_field
 %type <std::shared_ptr<NBlock>> struct_fields
-%type <std::shared_ptr<NExpression>> expr assignment function_call
+%type <std::shared_ptr<NExpression>> expr assignment function_call struct_method_call
+%type <std::shared_ptr<NStructFieldAccess>> struct_field_access
 %type <std::shared_ptr<NExpression>> numeric
 %type <std::shared_ptr<NIdentifier>> ident
 %type <std::shared_ptr<NBlock>> program stmts block
@@ -159,6 +160,16 @@ expr :
 | 	expr binary_op expr { $$ = std::move(std::shared_ptr<NBinaryOp>(new NBinaryOp($1, $2, $3))); }
 | 	LPAREN expr RPAREN { $$ = $2; }
 | 	numeric { $$ = $1; }
+|	struct_field_access { $$ = $1; }
+|	struct_method_call { $$ = $1; }
+;
+
+struct_field_access :
+	ident "." ident { $$ = std::move(std::shared_ptr<NStructFieldAccess>(new NStructFieldAccess($1, $3))); }
+;
+
+struct_method_call :
+	ident "." function_call { $$ = std::move(std::shared_ptr<NStructMethodCall>(new NStructMethodCall($1, $3))); }
 ;
 
 if_statement : 
@@ -177,6 +188,7 @@ return_statement :
 	 
 assignment : 
 	ident EQUAL expr { $$ = std::move(std::shared_ptr<NAssignment>(new NAssignment($1, $3))); }
+|	struct_field_access EQUAL expr { $$ = std::move(std::shared_ptr<NAssignment>(new NAssignment($1, $3))); }
 ;
 		   
 function_call : 

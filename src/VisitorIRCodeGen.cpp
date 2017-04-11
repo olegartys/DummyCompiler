@@ -6,6 +6,8 @@
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
+#include <StructTypeWrapper.h>
+#include <deque>
 
 #define YY_NULLPTR nullptr // FIXME: bison YY_NULLPTR bug
 #include "flex_bison_output/BisonParser.hpp"
@@ -77,11 +79,8 @@ void VisitorIRCodeGen::visit(struct NVariableDeclaration *declaration,  void* va
     Value* varDeclaration;
 
     // Check variable type
-    if ("int" == declaration->mType->mVal) {
-        varType = mCtx.builder().getInt32Ty();
-    } else if ("double" == declaration->mType->mVal) {
-        varType = mCtx.builder().getDoubleTy();
-    } else {
+    varType = const_cast<Type*>(mCtx.getTypeOf(declaration->mType->mVal));
+    if (!varType) {
         Log::error(LOG_TAG, "\"{}\" type is undefined", declaration->mType->mVal);
         exit(EXIT_FAILURE);
     }
@@ -150,28 +149,87 @@ void VisitorIRCodeGen::visit(class NAssignment *assignment, void *val) {
     Log::info(LOG_TAG, "Constructing NAssignment");
     llvm::Value **retVal = (llvm::Value **) val;
 
-    // Check whether the variable is in the namespace
-    bool isInLocalSymTable = mCtx.topBlock()->isInLocalSymTable(assignment->mLhs->mVal);
-    BasicBlock *scopeBblock = mCtx.topBlock()->mLlvmBlock;
-    if (!isInLocalSymTable) {
-        bool isInGlobalSymTable = isIdentifierInGlobalScope(assignment->mLhs->mVal,
-                                                            mCtx.topBlock()->mLlvmBlock->getParent(), scopeBblock);
-        if (!isInGlobalSymTable) {
-            Log::error(LOG_TAG, "Variable \"{}\" was not declared", assignment->mLhs->mVal);
+    // If lhs is variable
+    if (assignment->mLhs) {
+        // Check whether the variable is in the namespace
+        bool isInLocalSymTable = mCtx.topBlock()->isInLocalSymTable(assignment->mLhs->mVal);
+        BasicBlock *scopeBblock = mCtx.topBlock()->mLlvmBlock;
+        if (!isInLocalSymTable) {
+            bool isInGlobalSymTable = isIdentifierInGlobalScope(assignment->mLhs->mVal,
+                                                                mCtx.topBlock()->mLlvmBlock->getParent(), scopeBblock);
+            if (!isInGlobalSymTable) {
+                Log::error(LOG_TAG, "Variable \"{}\" was not declared", assignment->mLhs->mVal);
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        // Generate Value* for an rhs
+        auto rvalExprVal = mCtx.stubVal();
+        assignment->mRhs->accept(*this, &rvalExprVal);
+
+        // Generate store Value*
+        auto storeInstVal = new StoreInst(rvalExprVal,
+                                          mCtx.getIRCodeGenBlock(scopeBblock)->mSymTable[assignment->mLhs->mVal], false,
+                                          mCtx.topBlock()->mLlvmBlock);
+
+        *retVal = storeInstVal;
+
+    // If lhs is struct field
+    } else if (assignment->mStructField) {
+        // Check whether variable is in the struct and check access
+        // TODO: check access specificator
+        bool isInLocalSymTable = mCtx.topBlock()->isInLocalSymTable(assignment->mStructField->mStructName->mVal);
+        if (!isInLocalSymTable) {
+            Log::error(LOG_TAG, "Structure name \"{}\" is undefined.", assignment->mStructField->mStructName->mVal);
             exit(EXIT_FAILURE);
         }
+
+        // Search for StructTypeWrapper for this Value
+        auto structVal = mCtx.topBlock()->mSymTable[assignment->mStructField->mStructName->mVal];
+        auto strucValType = structVal->getType()->getPointerElementType();
+        auto structValTypeID = structVal->getType()->getPointerElementType()->getTypeID();
+        std::shared_ptr<StructTypeWrapper> structTypeWrapper(nullptr);
+        for (auto& struc: mCtx.permanentStructList()) {
+            Log::debug(LOG_TAG, "{} {}", structValTypeID, struc->mLlvmStructType->getTypeID());
+            if (struc->mLlvmStructType->getTypeID() == structValTypeID) {
+                structTypeWrapper = struc;
+            }
+        }
+        if (!structTypeWrapper) {
+            Log::error(LOG_TAG, "Compiler internal error.");
+            exit(EXIT_FAILURE);
+        }
+
+        // Check whether accessable field exists
+        bool isFieldDeclared = false;
+        for (auto& field: structTypeWrapper->mFieldsList) {
+            if (field.first == assignment->mStructField->mFieldName->mVal) {
+                isFieldDeclared = true;
+            }
+        }
+        if (!isFieldDeclared) {
+            Log::error(LOG_TAG, "Field name \"{}\" is not declared in structure \"{}\".",
+                       assignment->mStructField->mFieldName->mVal, assignment->mStructField->mStructName->mVal);
+            exit(EXIT_FAILURE);
+        }
+
+        // If it does - generate access instruction
+        // FIXME:
+        std::vector<Value*> valueIdx;
+        valueIdx.push_back(mCtx.stubVal());
+        auto accessField = GetElementPtrInst::CreateInBounds(/*strucValType, */structVal, valueIdx, "__tmp_struct_field", mCtx.topBlock()->mLlvmBlock);
+
+        // Generate Value* for an rhs
+        auto rvalExprVal = mCtx.stubVal();
+        assignment->mRhs->accept(*this, &rvalExprVal);
+
+        // Generate store Value*
+        auto storeInstVal = new StoreInst(rvalExprVal,
+                                          accessField, false,
+                                          mCtx.topBlock()->mLlvmBlock);
+
+        *retVal = storeInstVal;
     }
-
-    // Generate Value* for an rhs
-    auto rvalExprVal = mCtx.stubVal();
-    assignment->mRhs->accept(*this, &rvalExprVal);
-
-    // Generate store Value*
-    auto storeInstVal = new StoreInst(rvalExprVal,
-                                      mCtx.getIRCodeGenBlock(scopeBblock)->mSymTable[assignment->mLhs->mVal], false,
-                                      mCtx.topBlock()->mLlvmBlock);
-
-    *retVal = storeInstVal;
 }
 
 void VisitorIRCodeGen::visit(class NFunctionDeclaration *declaration, void *val) {
@@ -180,6 +238,15 @@ void VisitorIRCodeGen::visit(class NFunctionDeclaration *declaration, void *val)
 
     // Fiil argument types array
     std::vector<Type*> argTypes;
+    // Generate function name: if it is regular function, leave it; if it is in context of structure definition - make mangling
+    std::string funcName = declaration->mId->mVal;
+    if (!mCtx.structList().empty()) {
+        funcName = mCtx.methodNameMangle(mCtx.topStruct()->mStructTypeName, funcName);
+
+        // Also pass "this" pointer argument
+        argTypes.push_back(mCtx.topStruct()->mLlvmStructType);
+    }
+
     for (const auto& arg: *declaration->mArguments) {
         auto type = dynamic_cast<NVariableDeclaration*>(arg.get())->mType->mVal;
         if (!mCtx.getTypeOf(type)) {
@@ -197,8 +264,11 @@ void VisitorIRCodeGen::visit(class NFunctionDeclaration *declaration, void *val)
     }
     FunctionType* functionType = FunctionType::get(const_cast<Type*>(_funcType), argTypes, false);
 
+    // Change the Noide function for the mangled name
+    declaration->mId->mVal = funcName;
+
     // Create function and block for it
-    Function* function = Function::Create(functionType, GlobalValue::InternalLinkage, declaration->mId->mVal, &mCtx.module());
+    Function* function = Function::Create(functionType, GlobalValue::InternalLinkage, funcName, &mCtx.module());
     BasicBlock* functionBlock = BasicBlock::Create(getGlobalContext(), declaration->mId->mVal, function, 0);
 
     mCtx.pushBlock(functionBlock);
@@ -226,15 +296,32 @@ void VisitorIRCodeGen::visit(class NFunctionCall *call, void *val) {
     Log::info(LOG_TAG, "Constructing NFunctionCall");
     llvm::Value** retVal = (llvm::Value**)val;
 
-    auto caleeFunc = mCtx.module().getFunction(call->mId->mVal);
+    int argumentsSize = call->mArguments->size();
+
+    // Check whether it is method call
+    std::string functionName = call->mId->mVal;
+    if (mCtx.performMethodCall) {
+        //...then mangle method name
+        functionName = mCtx.methodNameMangle(mCtx.performMethodCallStructName, functionName);
+        argumentsSize += 1;
+    }
+
+    auto caleeFunc = mCtx.module().getFunction(functionName);
     if (!caleeFunc) {
-        Log::error(LOG_TAG, "Unknown function reference.");
+        Log::error(LOG_TAG, "Unknown function reference (\"{}\").", functionName);
         exit(EXIT_FAILURE);
-    } else if (caleeFunc->arg_size() != call->mArguments->size()) {
+    } else if (caleeFunc->arg_size() != argumentsSize) {
         Log::error(LOG_TAG, "Incorrect amount fo argmunets during function call.");
         exit(EXIT_FAILURE);
     } else {
         std::vector<Value *> funcArgs;
+        // For methodCall insert this pointer
+        if (mCtx.performMethodCall) {
+            NIdentifier _this(mCtx.performMethodCallStructInstName);
+            _this.accept(*this, val);
+            funcArgs.push_back(*(Value**)val);
+        }
+
         for (const auto& arg: *call->mArguments) {
             arg->accept(*this, val);
             funcArgs.push_back(*(Value**)val);
@@ -242,7 +329,13 @@ void VisitorIRCodeGen::visit(class NFunctionCall *call, void *val) {
 
         // Check types of the variables passed and in function definition
         auto caleeArgIter = caleeFunc->arg_begin();
-        for (int i = 0; i <  caleeFunc->arg_size(); ++i, ++caleeArgIter) {
+        int i = 0;
+        int argSize = caleeFunc->arg_size();
+        if (mCtx.performMethodCall) {
+            i = 1;
+            argSize -= 1;
+        }
+        for (int i = 0; i <  argSize; ++i, ++caleeArgIter) {
             if (caleeArgIter->getType()->getTypeID() != (funcArgs[i]->getType()->getTypeID())) {
                 Log::error(LOG_TAG, "Incorrect types of argument passed.");
                 exit(EXIT_FAILURE);
@@ -291,7 +384,6 @@ void VisitorIRCodeGen::visit(class NBinaryOp *op, void *val) {
             // Int32 comparison
             } else if (L->getType()->isIntegerTy()) {
                 Log::error(LOG_TAG, "HERE {} {}", L->getType()->getTypeID(), R->getType()->getTypeID());
-
 
                 *retVal = ICmpInst::Create(Instruction::ICmp, ICmpInst::ICMP_SLT, L, R, "__tmp_val_clt", mCtx.topBlock()->mLlvmBlock);
                // *retVal = mCtx.builder().CreateICmp(ICmpInst::ICMP_SLT, L, R, "__tmp_val_clt");
@@ -415,4 +507,64 @@ void VisitorIRCodeGen::visit(struct NForLoop *statement, void* val) {
 
     mCtx.pushBlock(afterBB);
     mCtx.builder().SetInsertPoint(afterBB);
+}
+
+void VisitorIRCodeGen::visit(class NStructField *field, void *val) {
+    Log::info(LOG_TAG, "Constructing NStructField");
+    auto topStruct = mCtx.topStruct();
+
+    auto decl = mCtx.stubVal();
+    field->mDeclaration->accept(*this, &decl);
+
+    topStruct->addField(decl->getName(), field->mAccessSpecifier, decl);
+}
+
+void VisitorIRCodeGen::visit(class NStructDecl *decl, void *val) {
+    Log::info(LOG_TAG, "Constructing NStructDecl");
+
+    if (decl->mIdentifier->mVal.find("_") != std::string::npos) {
+        Log::error(LOG_TAG, "Structure name must not contain \"-\" symbols.");
+        exit(EXIT_FAILURE);
+    }
+
+    auto structType = StructType::create(getGlobalContext(), decl->mIdentifier->mVal);
+    std::shared_ptr<StructTypeWrapper> structTypeWrapper(new StructTypeWrapper(decl->mIdentifier->mVal, structType));
+
+    mCtx.pushStruct(structTypeWrapper);
+
+    decl->mStructFields->accept(*this, val);
+
+    std::vector<Type*> fieldsTypes;
+    for (auto& field: mCtx.topStruct()->mFieldsList) {
+        fieldsTypes.push_back(field.second.second->getType());
+    }
+    mCtx.topStruct()->mLlvmStructType->setBody(fieldsTypes);
+
+    // Value* t = new AllocaInst(mCtx.topStruct()->mLlvmStructType, "struct", mCtx.topBlock()->mLlvmBlock);
+    mCtx.popStruct();
+}
+
+// TODO: need to delegate work from NIdentifier
+void VisitorIRCodeGen::visit(class NStructFieldAccess *decl, void *val) {
+    Log::info(LOG_TAG, "Constructing NStructFieldAccess");
+
+}
+
+void VisitorIRCodeGen::visit(class NStructMethodCall *decl, void *val) {
+    Log::info(LOG_TAG, "Constructing NStructMethodCall");
+
+    // Get structure type name
+    auto structValue = mCtx.topBlock()->mSymTable[decl->mStructName->mVal];
+    auto structTypePointer = mCtx.topBlock()->mSymTable[decl->mStructName->mVal]->getType();
+    auto structTypeName = mCtx.topBlock()->mSymTable[decl->mStructName->mVal]->getType()->getPointerElementType()->getStructName();
+
+    // TODO: check whether structure is exist
+    mCtx.structValue = structValue;
+    mCtx.performMethodCall = true;
+    mCtx.performMethodCallStructName = structTypeName;
+    mCtx.structTypePointer = structTypePointer;
+    mCtx.performMethodCallStructInstName = decl->mStructName->mVal;
+
+    decl->mMethodCall->accept(*this, val);
+
 }

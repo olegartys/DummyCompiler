@@ -114,6 +114,17 @@ public:
         decl->mStructFields->accept(*this);
     }
 
+    virtual void visit(class NStructFieldAccess *decl, void *pVoid) override {
+        Log::info(LOG_TAG, "[NStructFieldAccess]: visited");
+        decl->mFieldName->accept(*this);
+        decl->mStructName->accept(*this);
+    }
+
+    virtual void visit(class NStructMethodCall *decl, void *pVoid) override {
+        Log::info(LOG_TAG, "[NStructMethodCall]: visited");
+//        decl->mFieldName->accept(*this);
+//        decl->mStructName->accept(*this);
+    }
 };
 
 #endif //DUMMYCOMPILER_VISITORPRINT_H

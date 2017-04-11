@@ -52,6 +52,12 @@ const llvm::Type* IRCodeGenContext::getTypeOf(const std::string& type) const {
     } else if ("double" == type) {
         return mBuilder->getDoubleTy();
     } else {
+        // Try to search structures
+        for (auto& struc : mStructPermanentList) {
+            if (type == struc->mStructTypeName) {
+                return struc->mLlvmStructType;
+            }
+        }
         return nullptr;
     }
 }
