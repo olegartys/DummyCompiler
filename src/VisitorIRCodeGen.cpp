@@ -419,6 +419,7 @@ void VisitorIRCodeGen::visit(class NReturnStatement *statement, void *val) {
     }
 
     *retVal = ReturnInst::Create(getGlobalContext(), *(Value**)val, mCtx.topBlock()->mLlvmBlock);
+    mCtx.popBlock();
 }
 
 void VisitorIRCodeGen::visit(struct NExpressionStatement *statement, void* val) {
@@ -502,6 +503,9 @@ void VisitorIRCodeGen::visit(struct NForLoop *statement, void* val) {
     // Bfranching to afterloop if condition is true
     auto endVal = mCtx.stubVal();
     statement->mEnd->accept(*this, &endVal);
+
+    mCtx.popBlock();
+
     BasicBlock *afterBB = BasicBlock::Create(getGlobalContext(), "afterloop", function);
     mCtx.builder().CreateCondBr(endVal, loopBB, afterBB);
 
