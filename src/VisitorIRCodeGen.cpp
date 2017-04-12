@@ -284,7 +284,7 @@ void VisitorIRCodeGen::visit(class NFunctionDeclaration *declaration, void *val)
     // Generate IR for block of code inside it
     declaration->mBlock->accept(*this, val);
 
-    mCtx.popBlock();
+    // mCtx.popBlock();
 
     // Set old block for builder to insert instructions
    // mCtx.builder().SetInsertPoint(mCtx.topBlock()->mLlvmBlock);
